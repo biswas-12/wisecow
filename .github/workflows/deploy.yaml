@@ -3,8 +3,7 @@ name: Deploy to Kubernetes
 on:
   push:
     branches:
-      - main  # Runs when you push to the main branch
-  workflow_dispatch:  # Allows manual trigger
+      - main  # Runs on push to main branch
 
 jobs:
   build-and-push:
@@ -12,19 +11,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
+      - name: Log in to DockerHub
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push Docker image
+      - name: Build and Push Docker Image
         run: |
           docker build -t biswanath290/wisecow:latest .
           docker push biswanath290/wisecow:latest
@@ -32,27 +28,27 @@ jobs:
   deploy:
     name: Deploy to Kubernetes
     runs-on: ubuntu-latest
-    needs: build-and-push
+    needs: build-and-push  # Ensures deployment runs after Docker image build
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install kubectl manually
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "latest"
+
+      - name: Set Up Kubernetes Context
         run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          mv kubectl /usr/local/bin/
+          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+          export KUBECONFIG=$HOME/.kube/config
+          kubectl config current-context
 
-
-      - name: Configure Kubernetes credentials
-        run: |
-          echo "${{ secrets.KUBECONFIG }}" > kubeconfig
-          export KUBECONFIG=kubeconfig
-
-
-      - name: Deploy to Kubernetes
+      - name: Deploy Application
         run: |
           kubectl apply -f deployment.yaml
           kubectl apply -f service.yaml
-          kubectl rollout status deployment/wisecow-deployment
+
+      - name: Verify Deployment
+        run: kubectl get pods -o wide
