@@ -50,8 +50,6 @@ jobs:
           echo "${{ secrets.KUBECONFIG }}" > kubeconfig
           export KUBECONFIG=kubeconfig
 
-      - name: Check Kubernetes Context
-        run: kubectl config current-context
 
       - name: Apply Kubernetes Deployment
         run: kubectl apply -f deployment.yaml --validate=false
