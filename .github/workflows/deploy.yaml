@@ -51,11 +51,6 @@ jobs:
           export KUBECONFIG=kubeconfig
 
 
-      - name: Apply Kubernetes Deployment
-        run: kubectl apply -f deployment.yaml --validate=false
-
-
-
       - name: Deploy to Kubernetes
         run: |
           kubectl apply -f deployment.yaml
