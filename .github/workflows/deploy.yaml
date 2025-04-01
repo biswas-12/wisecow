@@ -3,57 +3,38 @@ name: Deploy to Kubernetes
 on:
   push:
     branches:
-      - main  # Runs on push to main branch
+      - main  # Change this to your deployment branch
 
 jobs:
-  build-and-push:
-    name: Build and Push Docker Image
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Log in to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and Push Docker Image
-        run: |
-          docker build -t biswanath290/wisecow:latest .
-          docker push biswanath290/wisecow:latest
-
   deploy:
-    name: Deploy to Kubernetes
     runs-on: ubuntu-latest
-    needs: build-and-push  # Ensures deployment runs after Docker image build
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: "latest"
-
-
-  
-      - name: Set Up Kubernetes Context
+      - name: Set up Kubernetes Context
         run: |
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
+          echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 --decode > $HOME/.kube/config
           export KUBECONFIG=$HOME/.kube/config
           kubectl config view
 
-
-
-      - name: Deploy Application
+      - name: Build and Push Docker Image
+        env:
+          IMAGE_NAME: myapp  # Change this to your app name
+          REGISTRY: docker.io  # Change if using another registry
         run: |
-          kubectl apply -f deployment.yaml
-          kubectl apply -f service.yaml
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker build -t $REGISTRY/${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:latest .
+          docker push $REGISTRY/${{ secrets.DOCKER_USERNAME }}/$IMAGE_NAME:latest
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f k8s/deployment.yaml  # Change path if needed
+          kubectl apply -f k8s/service.yaml     # Change path if needed
 
       - name: Verify Deployment
-        run: kubectl get pods -o wide
+        run: |
+          kubectl get pods
+          kubectl get services
